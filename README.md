@@ -6,7 +6,6 @@
 ![WordPress](https://img.shields.io/badge/WordPress-6.5%2B-21759B.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.1%2B-777BB4.svg)
 ![WooCommerce](https://img.shields.io/badge/WooCommerce-8.0%2B-96588A.svg)
-![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green.svg)
 
 ## Overview
 
