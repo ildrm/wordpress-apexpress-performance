@@ -7,6 +7,7 @@
  * Author:      Shahin Ilderemi
  * Author URI:  https://ildrm.com
  * License:     MIT
+ * License URI: https://opensource.org/license/mit
  * Text Domain: apexpress-performance
  * Requires at least: 6.5
  * Requires PHP: 8.1
