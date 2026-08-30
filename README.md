@@ -823,14 +823,6 @@ Adapt safely
 
 ---
 
-## License
-
-ApexPress Performance is licensed under the **GNU General Public License v2.0 or later**.
-
-See: <https://www.gnu.org/licenses/gpl-2.0.html>
-
----
-
 ## Author
 
 **Shahin Ilderemi**
