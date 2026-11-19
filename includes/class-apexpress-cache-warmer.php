@@ -27,6 +27,9 @@ final class ApexPress_Cache_Warmer {
 	}
 
 	public static function enqueue_urls( array $urls ): void {
+		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! ApexPress_Settings::get( 'cache_preload' ) ) {
+			return;
+		}
 		$queue = get_option( self::QUEUE, array() );
 		$queue = is_array( $queue ) ? $queue : array();
 		foreach ( $urls as $url ) {
@@ -40,6 +43,9 @@ final class ApexPress_Cache_Warmer {
 	}
 
 	public static function seed_site(): int {
+		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! ApexPress_Settings::get( 'cache_preload' ) ) {
+			return 0;
+		}
 		$urls = array( home_url( '/' ) );
 		$posts = get_posts(
 			array(
@@ -62,7 +68,7 @@ final class ApexPress_Cache_Warmer {
 	}
 
 	public function process(): void {
-		if ( ! ApexPress_Settings::get( 'cache_preload' ) ) {
+		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! ApexPress_Settings::get( 'cache_preload' ) ) {
 			return;
 		}
 		$queue = get_option( self::QUEUE, array() );

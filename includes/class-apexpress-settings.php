@@ -14,16 +14,16 @@ final class ApexPress_Settings {
 
 	public static function defaults(): array {
 		return array(
-			'page_cache'                     => 1,
+			'page_cache'                     => 0,
 			'cache_ttl'                      => 3600,
 			'cache_mobile_variant'           => 0,
 			'cache_query_strings'            => 0,
 			'cache_excludes'                 => "/wp-admin/*\n/wp-login.php\n/cart/*\n/checkout/*\n/my-account/*",
-			'cache_stale_if_error'           => 1,
-			'cache_browser_headers'          => 1,
-			'cache_preload'                  => 1,
+			'cache_stale_if_error'           => 0,
+			'cache_browser_headers'          => 0,
+			'cache_preload'                  => 0,
 			'cache_preload_batch'            => 5,
-			'html_minify'                    => 1,
+			'html_minify'                    => 0,
 			'css_minify'                     => 0,
 			'js_minify'                      => 0,
 			'js_defer'                       => 0,
@@ -31,36 +31,36 @@ final class ApexPress_Settings {
 			'js_defer_excludes'              => "jquery\njquery-core\njquery-migrate",
 			'js_delay'                       => 0,
 			'js_delay_patterns'              => "googletagmanager.com\ngoogle-analytics.com\nconnect.facebook.net\nhotjar.com",
-			'lazy_iframes'                   => 1,
-			'lazy_images'                    => 1,
+			'lazy_iframes'                   => 0,
+			'lazy_images'                    => 0,
 			'first_image_high_priority'      => 0,
-			'image_optimize_uploads'         => 1,
+			'image_optimize_uploads'         => 0,
 			'image_quality'                  => 82,
 			'image_max_width'                => 2560,
-			'image_generate_webp'            => 1,
+			'image_generate_webp'            => 0,
 			'image_generate_avif'            => 0,
 			'image_backup_originals'         => 1,
-			'font_display_swap'              => 1,
+			'font_display_swap'              => 0,
 			'cdn_enabled'                    => 0,
 			'cloudflare_purge'               => 0,
 			'cdn_url'                        => '',
 			'cdn_extensions'                 => 'css,js,jpg,jpeg,png,gif,webp,avif,svg,woff,woff2',
 			'preconnect_origins'             => '',
 			'preload_resources'              => '',
-			'speculation_mode'               => 'auto',
+			'speculation_mode'               => 'off',
 			'speculation_eagerness'          => 'auto',
 			'speculation_excludes'           => "/cart/*\n/checkout/*\n/my-account/*",
 			'remove_emojis'                  => 1,
 			'remove_embeds'                  => 0,
 			'remove_rsd'                     => 1,
 			'remove_wlw'                     => 1,
-			'remove_shortlink'               => 1,
+			'remove_shortlink'               => 0,
 			'disable_dashicons_guests'       => 0,
-			'heartbeat_mode'                 => 'reduce',
+			'heartbeat_mode'                 => 'default',
 			'heartbeat_interval'             => 60,
 			'woocommerce_safe_mode'          => 1,
 			'woocommerce_unload_nonshop'     => 0,
-			'rum_enabled'                    => 1,
+			'rum_enabled'                    => 0,
 			'rum_sample_rate'                => 10,
 			'rum_retention_days'             => 30,
 			'admin_toolbar_metrics'          => 1,
@@ -115,8 +115,8 @@ final class ApexPress_Settings {
 		$out['rum_sample_rate']    = min( 100, max( 1, absint( $input['rum_sample_rate'] ?? 10 ) ) );
 		$out['rum_retention_days'] = min( 365, max( 1, absint( $input['rum_retention_days'] ?? 30 ) ) );
 
-		$heartbeat = sanitize_key( $input['heartbeat_mode'] ?? 'reduce' );
-		$out['heartbeat_mode'] = in_array( $heartbeat, array( 'default', 'reduce', 'disable' ), true ) ? $heartbeat : 'reduce';
+		$heartbeat = sanitize_key( $input['heartbeat_mode'] ?? $defaults['heartbeat_mode'] );
+		$out['heartbeat_mode'] = in_array( $heartbeat, array( 'default', 'reduce', 'disable' ), true ) ? $heartbeat : $defaults['heartbeat_mode'];
 
 		$textareas = array( 'cache_excludes', 'js_async_handles', 'js_defer_excludes', 'js_delay_patterns', 'preconnect_origins', 'preload_resources', 'speculation_excludes' );
 		foreach ( $textareas as $key ) {
@@ -125,8 +125,8 @@ final class ApexPress_Settings {
 
 		$out['cdn_url'] = esc_url_raw( trim( (string) ( $input['cdn_url'] ?? '' ) ) );
 		$out['cdn_extensions'] = sanitize_text_field( (string) ( $input['cdn_extensions'] ?? $defaults['cdn_extensions'] ) );
-		$mode = sanitize_key( (string) ( $input['speculation_mode'] ?? 'auto' ) );
-		$out['speculation_mode'] = in_array( $mode, array( 'off', 'auto', 'prefetch', 'prerender' ), true ) ? $mode : 'auto';
+		$mode = sanitize_key( (string) ( $input['speculation_mode'] ?? $defaults['speculation_mode'] ) );
+		$out['speculation_mode'] = in_array( $mode, array( 'off', 'auto', 'prefetch', 'prerender' ), true ) ? $mode : $defaults['speculation_mode'];
 		$eagerness = sanitize_key( (string) ( $input['speculation_eagerness'] ?? 'auto' ) );
 		$out['speculation_eagerness'] = in_array( $eagerness, array( 'auto', 'conservative', 'moderate', 'eager' ), true ) ? $eagerness : 'auto';
 

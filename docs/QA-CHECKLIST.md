@@ -4,7 +4,7 @@ Use this checklist after installation and after every significant theme/plugin u
 
 ## Installation and lifecycle
 - Plugin activates without fatal errors on the target PHP/WordPress versions.
-- Deactivation removes scheduled ApexPress events without deleting configuration.
+- Deactivation removes scheduled ApexPress events and the ApexPress-owned early cache drop-in while retaining settings.
 - Uninstall retains data unless the explicit delete-on-uninstall setting is enabled.
 - A foreign `advanced-cache.php` is detected and left untouched.
 
@@ -24,14 +24,17 @@ Use this checklist after installation and after every significant theme/plugin u
 - Sliders, tabs, accordions, modals and popups work.
 - No new JavaScript console errors appear after enabling defer/delay.
 - CSS minification does not alter layout.
+- CSS fonts, images, and imports with relative URLs load from the original directory.
 - HTML minification does not join text from adjacent inline elements.
 - Third-party analytics/marketing behavior matches the selected delay policy.
 
 ## Media
 - New image uploads complete without error.
-- Original image backup is created before destructive optimization.
-- WebP/AVIF siblings are created only when supported.
+- Derivative generation leaves source file hashes and standard attachment metadata intact.
+- Typed WebP and AVIF sources appear only for enabled and supported formats.
+- Attachment markup stays the same across requests with different Accept headers.
 - Responsive image `srcset` remains valid.
+- An interrupted image job can be claimed after its lease expires and bounded retries retain failures for review.
 - Existing explicit Core loading/fetch-priority decisions are not overwritten unnecessarily.
 - Restoration is verified on at least one test attachment before bulk production use.
 

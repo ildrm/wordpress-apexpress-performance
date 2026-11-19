@@ -96,7 +96,10 @@ final class ApexPress_REST {
 		if ( ! is_array( $data ) ) {
 			return new WP_REST_Response( array( 'ok' => false ), 400 );
 		}
-		$path = isset( $data['path'] ) ? (string) $data['path'] : '/';
+		$path = $data['path'] ?? '/';
+		if ( ! is_string( $path ) ) {
+			return new WP_REST_Response( array( 'ok' => false ), 400 );
+		}
 		if ( strlen( $path ) > 250 || str_contains( $path, '?' ) ) {
 			$data['path'] = (string) wp_parse_url( $path, PHP_URL_PATH );
 		}

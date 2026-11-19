@@ -18,11 +18,11 @@ Core capabilities in this package:
 * Anonymous file page cache with atomic writes, TTL, targeted invalidation and cookie/query/path safeguards.
 * Optional advanced-cache.php drop-in for pre-WordPress cache serving. It never overwrites a foreign drop-in.
 * Bounded cache warming queue processed through WP-Cron.
-* HTML minification that preserves scripts, styles, preformatted content, textareas and block comments.
+* Conservative HTML compaction that preserves body text, attributes, scripts and comments.
 * Local CSS minification and conservative JavaScript compaction.
 * JavaScript defer, explicit async handles, and opt-in third-party interaction delay.
-* Image compression/resizing, WebP and AVIF generation when supported, and encrypted original-image backups before destructive replacement.
-* Modern image delivery based on browser Accept support for WordPress attachment markup.
+* Queued image compression and resizing to derivative files, leaving WordPress originals and their dimensions intact.
+* Typed picture sources for WebP and AVIF when supported by the host, with distinct URLs and shared cached HTML.
 * Image/iframe loading attributes with optional first-image priority heuristic.
 * WordPress bloat controls and Heartbeat tuning.
 * WooCommerce-safe page-cache bypass for Cart, Checkout, My Account, sessions, add-to-cart and API contexts.
