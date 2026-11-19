@@ -35,37 +35,41 @@ define( 'APEXPRESS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'APEXPRESS_URL', plugin_dir_url( __FILE__ ) );
 define( 'APEXPRESS_START', microtime( true ) );
 
-$apexpress_files = array(
-	'includes/class-apexpress-logger.php',
-	'includes/class-apexpress-settings.php',
-	'includes/class-apexpress-security.php',
-	'includes/class-apexpress-secure-storage.php',
-	'includes/class-apexpress-compatibility.php',
-	'includes/class-apexpress-cloudflare.php',
-	'includes/class-apexpress-server-config.php',
-	'includes/class-apexpress-cache.php',
-	'includes/class-apexpress-cache-warmer.php',
-	'includes/class-apexpress-css.php',
-	'includes/class-apexpress-frontend-optimizer.php',
-	'includes/class-apexpress-delivery.php',
-	'includes/class-apexpress-image-queue.php',
-	'includes/class-apexpress-image-optimizer.php',
-	'includes/class-apexpress-database.php',
-	'includes/class-apexpress-wordpress-optimizer.php',
-	'includes/class-apexpress-woocommerce.php',
-	'includes/class-apexpress-rum.php',
-	'includes/class-apexpress-audit.php',
-	'includes/class-apexpress-profiler.php',
-	'includes/class-apexpress-rest.php',
-	'includes/class-apexpress-cli.php',
-	'admin/class-apexpress-admin.php',
-	'includes/class-apexpress-activator.php',
-	'includes/class-apexpress-plugin.php',
+spl_autoload_register(
+	static function ( string $class ): void {
+		static $files = array(
+			'apexpress_activator'           => 'includes/class-apexpress-activator.php',
+			'apexpress_admin'               => 'admin/class-apexpress-admin.php',
+			'apexpress_audit'               => 'includes/class-apexpress-audit.php',
+			'apexpress_cache'               => 'includes/class-apexpress-cache.php',
+			'apexpress_cache_warmer'        => 'includes/class-apexpress-cache-warmer.php',
+			'apexpress_cli'                 => 'includes/class-apexpress-cli.php',
+			'apexpress_cloudflare'          => 'includes/class-apexpress-cloudflare.php',
+			'apexpress_compatibility'       => 'includes/class-apexpress-compatibility.php',
+			'apexpress_css'                 => 'includes/class-apexpress-css.php',
+			'apexpress_database'            => 'includes/class-apexpress-database.php',
+			'apexpress_delivery'            => 'includes/class-apexpress-delivery.php',
+			'apexpress_frontend_optimizer'  => 'includes/class-apexpress-frontend-optimizer.php',
+			'apexpress_image_optimizer'     => 'includes/class-apexpress-image-optimizer.php',
+			'apexpress_image_queue'         => 'includes/class-apexpress-image-queue.php',
+			'apexpress_logger'              => 'includes/class-apexpress-logger.php',
+			'apexpress_plugin'              => 'includes/class-apexpress-plugin.php',
+			'apexpress_profiler'            => 'includes/class-apexpress-profiler.php',
+			'apexpress_rest'                => 'includes/class-apexpress-rest.php',
+			'apexpress_rum'                 => 'includes/class-apexpress-rum.php',
+			'apexpress_secure_storage'      => 'includes/class-apexpress-secure-storage.php',
+			'apexpress_security'            => 'includes/class-apexpress-security.php',
+			'apexpress_server_config'       => 'includes/class-apexpress-server-config.php',
+			'apexpress_settings'            => 'includes/class-apexpress-settings.php',
+			'apexpress_woocommerce'         => 'includes/class-apexpress-woocommerce.php',
+			'apexpress_wordpress_optimizer' => 'includes/class-apexpress-wordpress-optimizer.php',
+		);
+		$key = strtolower( $class );
+		if ( isset( $files[ $key ] ) ) {
+			require_once APEXPRESS_DIR . $files[ $key ];
+		}
+	}
 );
-
-foreach ( $apexpress_files as $apexpress_file ) {
-	require_once APEXPRESS_DIR . $apexpress_file;
-}
 
 register_activation_hook( __FILE__, array( 'ApexPress_Activator', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'ApexPress_Activator', 'deactivate' ) );

@@ -39,8 +39,12 @@ final class ApexPress_Plugin {
 		( new ApexPress_RUM() )->hooks();
 		( new ApexPress_Profiler() )->hooks();
 		( new ApexPress_REST() )->hooks();
-		( new ApexPress_Admin() )->hooks();
-		ApexPress_CLI::register();
+		if ( is_admin() ) {
+			( new ApexPress_Admin() )->hooks();
+		}
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			ApexPress_CLI::register();
+		}
 	}
 
 	public function load_textdomain(): void {
