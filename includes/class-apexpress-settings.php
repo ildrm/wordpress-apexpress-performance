@@ -76,8 +76,11 @@ final class ApexPress_Settings {
 	}
 
 	public static function get( string $key, mixed $default = null ): mixed {
-		$settings = self::get_all();
-		return array_key_exists( $key, $settings ) ? $settings[ $key ] : $default;
+		$stored = get_option( self::OPTION, array() );
+		if ( is_array( $stored ) && array_key_exists( $key, $stored ) ) {
+			return $stored[ $key ];
+		}
+		return self::defaults()[ $key ] ?? $default;
 	}
 
 	public static function update( array $input ): array {
