@@ -9,6 +9,9 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/includes/class-apexpress-cache.php';
+ApexPress_Cache::remove_dropin();
+
 $settings = get_option( 'apexpress_settings', array() );
 if ( empty( $settings['delete_data_on_uninstall'] ) ) {
 	return;
@@ -24,18 +27,14 @@ delete_option( 'apexpress_settings' );
 delete_option( 'apexpress_version' );
 delete_option( 'apexpress_warm_queue' );
 delete_option( 'apexpress_image_queue' );
+delete_option( 'apexpress_image_queue_schema' );
+delete_option( 'apexpress_cache_revision' );
 delete_option( 'apexpress_recent_log' );
 
 $table = $wpdb->prefix . 'apexpress_rum_daily';
 $wpdb->query( "DROP TABLE IF EXISTS `{$table}`" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery
-
-$dropin = WP_CONTENT_DIR . '/advanced-cache.php';
-if ( is_file( $dropin ) ) {
-	$content = file_get_contents( $dropin ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-	if ( false !== $content && str_contains( $content, 'APEXPRESS_ADVANCED_CACHE' ) ) {
-		@unlink( $dropin ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.unlink_unlink
-	}
-}
+$jobs = $wpdb->prefix . 'apexpress_image_jobs';
+$wpdb->query( "DROP TABLE IF EXISTS `{$jobs}`" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery
 
 $cache_dir = trailingslashit( WP_CONTENT_DIR ) . 'cache/apexpress';
 if ( is_dir( $cache_dir ) ) {

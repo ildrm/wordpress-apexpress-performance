@@ -21,7 +21,7 @@ The plugin works locally without requiring an ApexPress cloud service. Features 
 
 ## Key Goals
 
-- **Fast by default** — anonymous page caching, cache warming, HTML optimization, modern image formats, resource hints, and browser-cache controls.
+- **Opt-in optimization** — enable page caching, asset changes, image derivatives, and monitoring individually. Upgrades retain saved settings.
 - **Safe by default** — personalized, authenticated, WooCommerce session, API, preview, search, and sensitive requests are excluded from page caching.
 - **Production-oriented** — bounded queues, atomic writes, targeted invalidation, encrypted backups, conservative JavaScript behavior, and reversible destructive operations.
 - **WooCommerce-aware** — Cart, Checkout, My Account, sessions, add-to-cart flows, Store API traffic, and related dynamic contexts are protected automatically.
@@ -95,7 +95,7 @@ in `wp-config.php`.
 
 #### CSS
 
-- Local CSS minification cache.
+- Local CSS compaction preserves strings and rebases relative fonts, images, and imports against the original stylesheet URL. Stylesheets that use unsupported URL syntax keep their original URL.
 - Opt-in behavior for safer staged rollout.
 
 #### JavaScript
@@ -112,17 +112,16 @@ JavaScript defer is deliberately **disabled by default** because dependency-sens
 
 ### 4. Images & Media
 
-- Upload-time image optimization.
-- Queue-based bulk media optimization.
+- Optional image jobs for new uploads and bulk media optimization.
+- Durable jobs with exclusive claims, automatic recovery of expired leases, and up to three attempts.
 - Configurable image quality.
 - Configurable maximum image width.
 - Image resizing through WordPress `WP_Image_Editor`.
 - WebP generation when supported by the active image editor.
 - Optional AVIF generation when supported by the host.
-- Browser `Accept`-aware modern image delivery.
-- WordPress attachment `src`/`srcset` integration.
-- Encrypted original-image backup before destructive replacement.
-- Programmatic original-image restore support.
+- WordPress attachment markup uses typed picture sources and distinct URLs for supported formats, so browsers can share cached HTML and choose a supported format.
+- Optimized files are derivatives. WordPress keeps the source files and their dimensions. Derivatives have their own recorded dimensions and optional encrypted source backups.
+- The restore API removes an attachment's derivatives and returns delivery to its WordPress original. Encrypted backups made by older versions can restore files they replaced.
 - Lazy image loading support.
 - Lazy iframe loading.
 - Image decoding/loading attribute optimization.
@@ -345,28 +344,20 @@ The initial configuration intentionally favors safety.
 
 ### Enabled by default
 
-- Page cache.
-- Cache stale-on-error behavior.
-- Browser cache headers.
-- Cache preloading.
-- HTML minification.
-- Lazy iframes.
-- Lazy images.
-- Upload-time image optimization.
-- WebP generation where supported.
 - Original image backups.
-- `font-display: swap` support.
 - Emoji removal.
 - RSD removal.
 - WLW removal.
-- Shortlink removal.
-- Reduced Heartbeat frequency.
 - WooCommerce-safe mode.
-- RUM.
 - Administrator toolbar metrics.
 
 ### Disabled by default
 
+- Page cache, preloading, stale-on-error, and browser cache header overrides.
+- HTML compaction, lazy image and iframe loading, inline font rewriting, and speculative navigation.
+- Upload-time optimization, WebP and AVIF generation.
+- Real User Monitoring.
+- Shortlink removal and Heartbeat changes.
 - Query-string page caching.
 - Separate mobile cache variant.
 - CSS minification.
@@ -374,7 +365,6 @@ The initial configuration intentionally favors safety.
 - JavaScript defer.
 - Third-party JavaScript delay.
 - First-image priority heuristic.
-- AVIF generation.
 - CDN rewriting.
 - Cloudflare purge integration.
 - WooCommerce asset unloading outside shop contexts.

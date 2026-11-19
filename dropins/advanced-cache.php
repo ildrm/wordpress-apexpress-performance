@@ -4,7 +4,7 @@
  * Early page cache drop-in for ApexPress Performance.
  */
 
-if ( ! defined( 'WP_CONTENT_DIR' ) ) {
+if ( ! defined( 'WP_CONTENT_DIR' ) || ( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE ) ) {
 	return;
 }
 
@@ -14,11 +14,14 @@ if ( ! is_readable( $apx_config ) ) {
 	return;
 }
 $apx_cfg = json_decode( (string) file_get_contents( $apx_config ), true );
-if ( ! is_array( $apx_cfg ) || empty( $apx_cfg['enabled'] ) ) {
+if ( ! is_array( $apx_cfg ) || 2 !== ( $apx_cfg['version'] ?? null ) || empty( $apx_cfg['enabled'] ) ) {
 	return;
 }
 $apx_method = strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) );
 if ( 'GET' !== $apx_method && 'HEAD' !== $apx_method ) {
+	return;
+}
+if ( isset( $_SERVER['HTTP_AUTHORIZATION'] ) || isset( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) || isset( $_SERVER['HTTP_RANGE'] ) ) {
 	return;
 }
 $apx_uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '/' );
@@ -64,7 +67,7 @@ $apx_home_host = strtolower( (string) ( $apx_cfg['home_host'] ?? '' ) );
 if ( '' === $apx_host || '' === $apx_home_host || ! hash_equals( $apx_home_host, $apx_host ) ) {
 	return;
 }
-$apx_normalized = $apx_host . $apx_path;
+$apx_normalized = 'v2|' . $apx_host . $apx_path;
 if ( ! empty( $apx_cfg['query_strings'] ) ) {
 	$apx_query = (string) parse_url( $apx_uri, PHP_URL_QUERY );
 	if ( $apx_query ) {
@@ -72,8 +75,10 @@ if ( ! empty( $apx_cfg['query_strings'] ) ) {
 	}
 }
 if ( ! empty( $apx_cfg['mobile_variant'] ) ) {
-	$apx_ua     = strtolower( (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
-	$apx_mobile = (bool) preg_match( '/android|iphone|ipad|ipod|mobile|opera mini|iemobile/', $apx_ua );
+	$apx_ua     = (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' );
+	$apx_mobile = isset( $_SERVER['HTTP_SEC_CH_UA_MOBILE'] )
+		? '?1' === $_SERVER['HTTP_SEC_CH_UA_MOBILE']
+		: (bool) preg_match( '/Mobile|Android|Silk\/|Kindle|BlackBerry|Opera Mini|Opera Mobi/', $apx_ua );
 	$apx_normalized .= $apx_mobile ? '|mobile' : '|desktop';
 }
 $apx_key  = hash( 'sha256', $apx_normalized );
@@ -88,7 +93,13 @@ if ( ! is_array( $apx_data ) || empty( $apx_data['expires'] ) || time() > (int) 
 	return;
 }
 header( 'X-ApexPress-Cache: HIT; early' );
-header( 'Content-Type: text/html; charset=UTF-8' );
+header( 'Content-Type: text/html; charset=' . (string) ( $apx_cfg['charset'] ?? 'UTF-8' ) );
+if ( ! empty( $apx_cfg['browser_headers'] ) ) {
+	header( 'Cache-Control: public, max-age=0, must-revalidate' );
+}
+if ( ! empty( $apx_cfg['mobile_variant'] ) ) {
+	header( 'Vary: Sec-CH-UA-Mobile, User-Agent', false );
+}
 if ( 'HEAD' !== $apx_method ) {
 	readfile( $apx_html );
 }

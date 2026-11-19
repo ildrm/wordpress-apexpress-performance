@@ -15,7 +15,8 @@ final class ApexPress_Audit {
 		$checks = array();
 		$checks[] = self::check( 'php', __( 'Modern PHP runtime', 'apexpress-performance' ), PHP_VERSION_ID >= 80300, PHP_VERSION, 10, PHP_VERSION_ID >= 80100 );
 		$checks[] = self::check( 'opcache', __( 'PHP OPcache', 'apexpress-performance' ), function_exists( 'opcache_get_status' ) && (bool) ini_get( 'opcache.enable' ), ini_get( 'opcache.enable' ) ? 'Enabled' : 'Disabled', 10 );
-		$checks[] = self::check( 'object_cache', __( 'Persistent object cache', 'apexpress-performance' ), wp_using_ext_object_cache(), wp_using_ext_object_cache() ? 'Enabled' : 'Not detected', 12 );
+		$object_cache = ApexPress_Compatibility::has_persistent_object_cache();
+		$checks[] = self::check( 'object_cache', __( 'Persistent object cache', 'apexpress-performance' ), $object_cache, $object_cache ? 'Enabled' : 'Not detected', 12 );
 		$checks[] = self::check( 'page_cache', __( 'ApexPress page cache', 'apexpress-performance' ), (bool) ApexPress_Settings::get( 'page_cache' ), ApexPress_Settings::get( 'page_cache' ) ? 'Enabled' : 'Disabled', 12 );
 		$dropin   = ApexPress_Cache::dropin_status();
 		$checks[] = self::check( 'early_cache', __( 'Early cache drop-in', 'apexpress-performance' ), ! empty( $dropin['owned'] ) && ! empty( $dropin['wp_cache'] ), ! empty( $dropin['owned'] ) ? ( ! empty( $dropin['wp_cache'] ) ? 'Active' : 'WP_CACHE disabled' ) : 'Not installed', 8 );
@@ -46,6 +47,7 @@ final class ApexPress_Audit {
 			'conflicts'   => ApexPress_Compatibility::conflicting_plugins(),
 			'warm_queue'  => ApexPress_Cache_Warmer::queue_size(),
 			'image_queue' => ApexPress_Image_Optimizer::queue_size(),
+			'image_jobs_failed' => ApexPress_Image_Queue::count( true ),
 		);
 	}
 

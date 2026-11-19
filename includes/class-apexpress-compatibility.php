@@ -60,6 +60,6 @@ final class ApexPress_Compatibility {
 	}
 
 	public static function has_persistent_object_cache(): bool {
-		return wp_using_ext_object_cache();
+		return (bool) wp_using_ext_object_cache();
 	}
 }

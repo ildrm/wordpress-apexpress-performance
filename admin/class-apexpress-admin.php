@@ -267,14 +267,15 @@ final class ApexPress_Admin {
 	}
 
 	private function render_media( array $s ): void {
+		$failed = ApexPress_Image_Queue::count( true );
 		$this->settings_open( 'media' );
 		?>
 		<div class="apx-grid apx-grid-2">
 			<div class="apx-card">
 				<?php $this->card_title( 'IMAGE PIPELINE', __( 'Smaller, modern images', 'apexpress-performance' ), __( 'Uses the WordPress image editor abstraction, so Imagick/GD capability is detected instead of assumed.', 'apexpress-performance' ) ); ?>
-				<?php $this->toggle( 'image_optimize_uploads', __( 'Optimize new uploads', 'apexpress-performance' ), $s['image_optimize_uploads'], __( 'Compresses JPEG/PNG/WebP/AVIF images and preserves a backup before changing the original.', 'apexpress-performance' ) ); ?>
+				<?php $this->toggle( 'image_optimize_uploads', __( 'Optimize new uploads', 'apexpress-performance' ), $s['image_optimize_uploads'], __( 'Queues JPEG, PNG, WebP and AVIF uploads for optimization. WordPress keeps its original files.', 'apexpress-performance' ) ); ?>
 				<?php $this->number( 'image_quality', __( 'Image quality', 'apexpress-performance' ), $s['image_quality'], 40, 100 ); ?>
-				<?php $this->number( 'image_max_width', __( 'Maximum original width', 'apexpress-performance' ), $s['image_max_width'], 640, 7680 ); ?>
+				<?php $this->number( 'image_max_width', __( 'Maximum optimized width', 'apexpress-performance' ), $s['image_max_width'], 640, 7680 ); ?>
 				<?php $this->toggle( 'image_generate_webp', __( 'Generate WebP', 'apexpress-performance' ), $s['image_generate_webp'], __( 'Generated only when the active WordPress image editor supports WebP.', 'apexpress-performance' ) ); ?>
 				<?php $this->toggle( 'image_generate_avif', __( 'Generate AVIF', 'apexpress-performance' ), $s['image_generate_avif'], __( 'Generated only when the active image editor supports AVIF.', 'apexpress-performance' ) ); ?>
 				<?php $this->toggle( 'image_backup_originals', __( 'Backup originals', 'apexpress-performance' ), $s['image_backup_originals'], __( 'Strongly recommended. Original files are copied to a non-public operational backup directory before optimization.', 'apexpress-performance' ) ); ?>
@@ -288,6 +289,9 @@ final class ApexPress_Admin {
 			</div>
 		</div>
 		<?php $this->settings_close(); ?>
+		<?php if ( $failed ) : ?>
+			<p><?php echo esc_html( sprintf( _n( '%s image job reached its retry limit. Queue the media library to retry it.', '%s image jobs reached their retry limit. Queue the media library to retry them.', $failed, 'apexpress-performance' ), number_format_i18n( $failed ) ) ); ?></p>
+		<?php endif; ?>
 		<div class="apx-actions apx-section-gap"><?php $this->action_form( 'apexpress_optimize_images', __( 'Queue media library optimization', 'apexpress-performance' ), 'primary' ); ?></div>
 		<?php
 	}

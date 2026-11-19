@@ -48,6 +48,7 @@ final class ApexPress_Plugin {
 	}
 
 	public function ensure_schedules(): void {
+		ApexPress_Cache::upgrade_dropin();
 		ApexPress_Activator::schedule_events();
 	}
 }

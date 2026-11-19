@@ -39,8 +39,8 @@ This matrix distinguishes **working local features in v1.0.0** from capabilities
 - WebP generation when supported by the host image editor.
 - AVIF generation when supported and enabled.
 - Browser Accept-based modern format delivery for WordPress attachment `src`/`srcset`.
-- Encrypted original image backup before destructive replacement.
-- Programmatic original-image restore API.
+- Reversible derivatives with optional encrypted original-image backups.
+- Programmatic restore API for derivatives and readable backups from earlier versions.
 - Bounded media optimization queue.
 
 ### WordPress and WooCommerce

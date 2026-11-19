@@ -22,11 +22,14 @@ final class ApexPress_Activator {
 		}
 		ApexPress_Cache::write_dropin_config_static();
 		self::create_tables();
+		ApexPress_Image_Queue::ensure();
 		self::schedule_events();
 		update_option( 'apexpress_version', APEXPRESS_VERSION, false );
 	}
 
 	public static function deactivate(): void {
+		ApexPress_Cache::remove_dropin();
+		( new ApexPress_Cache() )->purge_all();
 		wp_clear_scheduled_hook( 'apexpress_process_warm_queue' );
 		wp_clear_scheduled_hook( 'apexpress_process_image_queue' );
 		wp_clear_scheduled_hook( 'apexpress_daily_maintenance' );
@@ -36,8 +39,12 @@ final class ApexPress_Activator {
 		if ( ! wp_next_scheduled( 'apexpress_process_warm_queue' ) ) {
 			wp_schedule_event( time() + 120, 'apexpress_five_minutes', 'apexpress_process_warm_queue' );
 		}
-		if ( ! wp_next_scheduled( 'apexpress_process_image_queue' ) ) {
-			wp_schedule_event( time() + 180, 'hourly', 'apexpress_process_image_queue' );
+		$image_schedule = wp_get_schedule( 'apexpress_process_image_queue' );
+		if ( 'hourly' === $image_schedule ) {
+			wp_clear_scheduled_hook( 'apexpress_process_image_queue' );
+		}
+		if ( 'apexpress_five_minutes' !== $image_schedule && ! wp_next_scheduled( 'apexpress_process_image_queue' ) ) {
+			wp_schedule_event( time() + 180, 'apexpress_five_minutes', 'apexpress_process_image_queue' );
 		}
 		if ( ! wp_next_scheduled( 'apexpress_daily_maintenance' ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'apexpress_daily_maintenance' );

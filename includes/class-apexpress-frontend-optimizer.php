@@ -35,40 +35,32 @@ final class ApexPress_Frontend_Optimizer {
 		if ( '' === trim( $html ) || ! str_contains( strtolower( $html ), '<html' ) ) {
 			return $html;
 		}
-		if ( ApexPress_Settings::get( 'font_display_swap' ) ) {
-			$html = preg_replace_callback(
-				'/@font-face\s*\{[^}]*\}/is',
-				static function ( array $match ): string {
-					$block = $match[0];
-					if ( stripos( $block, 'font-display:' ) === false ) {
-						$block = preg_replace( '/}\s*$/', 'font-display:swap;}', $block ) ?? $block;
-					}
-					return $block;
-				},
-				$html
-			) ?? $html;
-		}
-		if ( ! ApexPress_Settings::get( 'html_minify' ) ) {
-			return $html;
+		$minify = ApexPress_Settings::get( 'html_minify' );
+		$fonts = ApexPress_Settings::get( 'font_display_swap' );
+		$processor = new WP_HTML_Tag_Processor( $html );
+		if ( ! method_exists( $processor, 'set_modifiable_text' ) ) {
+			return $minify ? trim( $html ) : $html;
 		}
 
-		$protected = array();
-		$html = preg_replace_callback(
-			'#<(pre|textarea|script|style)(?:\s[^>]*)?>.*?</\1>#is',
-			static function ( array $match ) use ( &$protected ): string {
-				$key               = '___APEXPRESS_BLOCK_' . count( $protected ) . '___';
-				$protected[ $key ] = $match[0];
-				return $key;
-			},
-			$html
-		) ?? $html;
-		$html = preg_replace( '/<!--(?!\[if|<!|\s*wp:|\s*\/wp:)[\s\S]*?-->/', '', $html ) ?? $html;
-		$html = preg_replace( '/>\s+</', '> <', $html ) ?? $html;
-		$html = preg_replace( '/[\t ]{2,}/', ' ', $html ) ?? $html;
-		foreach ( $protected as $key => $block ) {
-			$html = str_replace( $key, $block, $html );
+		$in_head = false;
+		while ( $processor->next_token() ) {
+			$tag = $processor->get_tag();
+			if ( 'HEAD' === $tag ) {
+				$in_head = ! $processor->is_tag_closer();
+			} elseif ( 'BODY' === $tag ) {
+				$in_head = false;
+			} elseif ( $fonts && 'STYLE' === $tag && ! $processor->is_tag_closer() ) {
+				$css = $processor->get_modifiable_text();
+				$updated = ApexPress_CSS::add_font_display( $css );
+				if ( $css !== $updated ) {
+					$processor->set_modifiable_text( $updated );
+				}
+			} elseif ( $minify && $in_head && '#text' === $processor->get_token_type() && '' === trim( $processor->get_modifiable_text() ) ) {
+				$processor->set_modifiable_text( '' );
+			}
 		}
-		return trim( $html );
+		$html = $processor->get_updated_html();
+		return $minify ? trim( $html ) : $html;
 	}
 
 	public function maybe_minify_css_url( string $src, string $handle ): string {
@@ -137,7 +129,7 @@ final class ApexPress_Frontend_Optimizer {
 				$attr['fetchpriority'] = 'high';
 			}
 		}
-		return ApexPress_Image_Optimizer::prefer_modern_format_attributes( $attr );
+		return $attr;
 	}
 
 	public function lazy_load_content_iframes( string $content ): string {
@@ -169,21 +161,22 @@ final class ApexPress_Frontend_Optimizer {
 	}
 
 	private function minified_asset_url( string $src, string $type ): string|false {
-		$path = $this->local_asset_path( $src );
-		if ( ! $path || ! is_readable( $path ) || filesize( $path ) > 2 * MB_IN_BYTES ) {
+		$source = $this->absolute_asset_url( html_entity_decode( $src, ENT_QUOTES ) );
+		$path = $source ? $this->local_asset_path( $source ) : false;
+		if ( ! $path || strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ) !== $type || ! is_readable( $path ) || filesize( $path ) > 2 * MB_IN_BYTES ) {
 			return false;
 		}
 		ApexPress_Cache::ensure_dirs();
 		$mtime = (int) filemtime( $path );
-		$key   = hash( 'sha256', $path . '|' . $mtime . '|' . APEXPRESS_VERSION );
+		$key   = hash( 'sha256', "2|{$source}|{$path}|{$mtime}|" . APEXPRESS_VERSION );
 		$file  = ApexPress_Cache::base_dir() . 'assets/' . $key . '.min.' . $type;
 		if ( ! file_exists( $file ) ) {
 			$code = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			if ( false === $code ) {
 				return false;
 			}
-			$minified = 'css' === $type ? $this->minify_css( $code ) : $this->minify_js_conservative( $code );
-			if ( false === file_put_contents( $file, $minified, LOCK_EX ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			$minified = 'css' === $type ? ApexPress_CSS::relocate( $code, $source ) : $this->minify_js_conservative( $code );
+			if ( false === $minified || ! ApexPress_Cache::atomic_write( $file, $minified ) ) {
 				return false;
 			}
 		}
@@ -191,38 +184,56 @@ final class ApexPress_Frontend_Optimizer {
 		return add_query_arg( 'v', $mtime, $content_url );
 	}
 
-	private function local_asset_path( string $src ): string|false {
-		$src = html_entity_decode( $src, ENT_QUOTES );
-		$url = wp_parse_url( $src );
-		if ( empty( $url['path'] ) ) {
-			return false;
+	private function absolute_asset_url( string $url ): string|false {
+		if ( ! str_starts_with( $url, '/' ) ) {
+			return preg_match( '~^https?://~i', $url ) ? $url : false;
 		}
 		$home = wp_parse_url( home_url( '/' ) );
-		if ( ! empty( $url['host'] ) && ! empty( $home['host'] ) && strtolower( $url['host'] ) !== strtolower( $home['host'] ) ) {
+		if ( empty( $home['host'] ) || empty( $home['scheme'] ) ) {
 			return false;
 		}
-		$root = realpath( ABSPATH );
-		$path = realpath( ABSPATH . ltrim( $url['path'], '/' ) );
-		if ( ! $root || ! $path || ! str_starts_with( $path, $root . DIRECTORY_SEPARATOR ) ) {
+		if ( str_starts_with( $url, '//' ) ) {
+			return $home['scheme'] . ':' . $url;
+		}
+		return $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' ) . $url;
+	}
+
+	private function local_asset_path( string $src ): string|false {
+		$url = wp_parse_url( $src );
+		if ( empty( $url['path'] ) || empty( $url['host'] ) || isset( $url['user'] ) || isset( $url['pass'] ) ) {
 			return false;
 		}
-		return $path;
+		$roots = array( content_url( '/' ) => WP_CONTENT_DIR, site_url( '/' ) => ABSPATH );
+		foreach ( $roots as $base_url => $directory ) {
+			$base = wp_parse_url( $base_url );
+			$prefix = trailingslashit( $base['path'] ?? '/' );
+			if ( 0 !== strcasecmp( $url['host'], $base['host'] ?? '' ) || ( $url['port'] ?? null ) !== ( $base['port'] ?? null ) || ! str_starts_with( $url['path'], $prefix ) ) {
+				continue;
+			}
+			$root = realpath( $directory );
+			$relative = rawurldecode( substr( $url['path'], strlen( $prefix ) ) );
+			if ( ! $root || str_contains( $relative, "\0" ) ) {
+				continue;
+			}
+			$path = realpath( $root . DIRECTORY_SEPARATOR . $relative );
+			if ( $path && is_file( $path ) && str_starts_with( $path, $root . DIRECTORY_SEPARATOR ) ) {
+				return $path;
+			}
+		}
+
+		return false;
 	}
 
-	private function minify_css( string $css ): string {
-		$css = preg_replace( '!/\*[^!*][\s\S]*?\*/!', '', $css ) ?? $css;
-		$css = preg_replace( '/\s+/', ' ', $css ) ?? $css;
-		$css = preg_replace( '/\s*([{}:;,>])\s*/', '$1', $css ) ?? $css;
-		$css = str_replace( ';}', '}', $css );
-		return trim( $css );
-	}
-
-	private function minify_js_conservative( string $js ): string {
-		$lines = preg_split( '/\R/', $js ) ?: array();
+	private function minify_js_conservative( string $js ): string|false {
+		if ( str_contains( $js, '`' )
+			|| preg_match( '/\\\\[ \t]*(?:\r\n?|\n)|\b(?:import|export|currentScript)\b|sourceMappingURL|sourceURL/', $js ) ) {
+			return false;
+		}
+		$lines = preg_split( '/\r\n?|\n/', $js ) ?: array();
 		$out   = array();
 		foreach ( $lines as $line ) {
-			$line = rtrim( $line );
-			if ( '' !== trim( $line ) ) {
+			$line = rtrim( $line, " \t" );
+			if ( '' !== $line ) {
 				$out[] = $line;
 			}
 		}
