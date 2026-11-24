@@ -25,7 +25,13 @@ final class ApexPress_Cloudflare {
 		if ( empty( $urls ) ) {
 			return array( 'ok' => false, 'message' => __( 'No valid local URLs were supplied to Cloudflare purge.', 'apexpress-performance' ) );
 		}
-		return self::request( array( 'files' => array_slice( $urls, 0, 30 ) ) );
+		foreach ( array_chunk( $urls, 30 ) as $batch ) {
+			$result = self::request( array( 'files' => $batch ) );
+			if ( ! $result['ok'] ) {
+				return $result;
+			}
+		}
+		return $result;
 	}
 
 	public static function purge_everything(): array {

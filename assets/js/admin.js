@@ -1,1 +1,28 @@
-(function(){'use strict';document.addEventListener('submit',function(event){var form=event.target;if(!(form instanceof HTMLFormElement))return;var message=form.getAttribute('data-apx-confirm');if(message&&!window.confirm(message)){event.preventDefault();return;}var button=form.querySelector('button[type="submit"]');if(button){button.disabled=true;button.setAttribute('aria-busy','true');var text=button.textContent;button.dataset.apxOriginal=text;button.textContent=(window.ApexPressAdmin&&ApexPressAdmin.working)||'Working…';setTimeout(function(){button.disabled=false;button.removeAttribute('aria-busy');button.textContent=button.dataset.apxOriginal||text;},15000);}});})();
+(function () {
+	'use strict';
+
+	document.addEventListener('submit', function (event) {
+		const form = event.target;
+		if (!(form instanceof HTMLFormElement) || !form.closest('.apx-wrap') || event.defaultPrevented) return;
+
+		const message = form.getAttribute('data-apx-confirm');
+		if (message && !window.confirm(message)) {
+			event.preventDefault();
+			return;
+		}
+		const button = event.submitter;
+		if (!(button instanceof HTMLButtonElement)) return;
+		if (button.getAttribute('aria-busy') === 'true') {
+			event.preventDefault();
+			return;
+		}
+
+		const label = button.textContent;
+		button.setAttribute('aria-busy', 'true');
+		button.textContent = window.ApexPressAdmin?.working || 'Working…';
+		window.setTimeout(function () {
+			button.removeAttribute('aria-busy');
+			button.textContent = label;
+		}, 15000);
+	});
+})();

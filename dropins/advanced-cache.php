@@ -14,7 +14,7 @@ if ( ! is_readable( $apx_config ) ) {
 	return;
 }
 $apx_cfg = json_decode( (string) file_get_contents( $apx_config ), true );
-if ( ! is_array( $apx_cfg ) || 2 !== ( $apx_cfg['version'] ?? null ) || empty( $apx_cfg['enabled'] ) ) {
+if ( ! is_array( $apx_cfg ) || 3 !== ( $apx_cfg['version'] ?? null ) || empty( $apx_cfg['enabled'] ) ) {
 	return;
 }
 $apx_method = strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) );
@@ -61,16 +61,18 @@ foreach ( array_keys( $_COOKIE ) as $apx_cookie ) {
 		return;
 	}
 }
-$apx_host_raw = (string) ( $_SERVER['HTTP_HOST'] ?? '' );
-$apx_host = strtolower( (string) parse_url( 'http://' . $apx_host_raw, PHP_URL_HOST ) );
-$apx_home_host = strtolower( (string) ( $apx_cfg['home_host'] ?? '' ) );
-if ( '' === $apx_host || '' === $apx_home_host || ! hash_equals( $apx_home_host, $apx_host ) ) {
+$apx_authority = strtolower( (string) ( $_SERVER['HTTP_HOST'] ?? '' ) );
+$apx_https = isset( $_SERVER['HTTPS'] )
+	? in_array( strtolower( (string) $_SERVER['HTTPS'] ), array( 'on', '1' ), true )
+	: '443' === (string) ( $_SERVER['SERVER_PORT'] ?? '' );
+$apx_scheme = $apx_https ? 'https' : 'http';
+if ( '' === $apx_authority || $apx_authority !== ( $apx_cfg['authority'] ?? '' ) || $apx_scheme !== ( $apx_cfg['scheme'] ?? '' ) ) {
 	return;
 }
-$apx_normalized = 'v2|' . $apx_host . $apx_path;
+$apx_normalized = 'v3|' . $apx_scheme . '://' . $apx_authority . $apx_path;
 if ( ! empty( $apx_cfg['query_strings'] ) ) {
 	$apx_query = (string) parse_url( $apx_uri, PHP_URL_QUERY );
-	if ( $apx_query ) {
+	if ( '' !== $apx_query ) {
 		$apx_normalized .= '?' . $apx_query;
 	}
 }

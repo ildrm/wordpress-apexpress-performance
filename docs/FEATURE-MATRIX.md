@@ -9,7 +9,7 @@ This matrix distinguishes **working local features in v1.0.0** from capabilities
 - Safe bypass for authenticated visitors, previews, searches, 404s, feeds, AJAX/JSON, non-GET/HEAD requests, configurable paths, personalized cookies and WooCommerce sessions.
 - Canonical-host validation to prevent untrusted Host-header cache namespaces.
 - Query-string caching is off by default and, when enabled, rejects sensitive query keys, oversized URLs and excessive parameters.
-- Optional `advanced-cache.php` drop-in for pre-WordPress cache hits; foreign drop-ins are never overwritten.
+- Optional `advanced-cache.php` drop-in for pre-WordPress cache hits; foreign drop-ins are never overwritten. With AegisGuard active, hits run through WordPress so its firewall and response headers apply.
 - `HEAD` requests return headers without replaying a cached HTML body.
 - Stale cached HTML can be served for an origin 5xx response within a bounded stale window.
 - Targeted post/archive/taxonomy invalidation plus cache warming of affected URLs.
@@ -55,7 +55,7 @@ This matrix distinguishes **working local features in v1.0.0** from capabilities
 ### Database and diagnostics
 - Autoloaded-option byte analysis and largest-option report.
 - Counts for revisions, auto drafts, trash, spam/trash comments and orphan postmeta.
-- Explicit, bounded database cleanup.
+- Explicit, bounded database cleanup. Auto-drafts become eligible after seven days. The media library and WooCommerce retain control of attachment, product, coupon and order deletion.
 - Encrypted pre-cleanup snapshot; if encryption/backup fails, cleanup is cancelled.
 - Post/comment deletion via WordPress APIs so related core cleanup hooks run.
 - Selected orphan-meta/transient cleanup only after the selected rows were snapshotted.

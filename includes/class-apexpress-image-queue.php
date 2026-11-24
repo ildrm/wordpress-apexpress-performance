@@ -20,9 +20,13 @@ final class ApexPress_Image_Queue {
 		return $wpdb->prefix . 'apexpress_image_jobs';
 	}
 
-	public static function ensure(): bool {
+	public static function schema_current(): bool {
+		return 2 === (int) get_option( self::SCHEMA );
+	}
+
+	public static function ensure( bool $verify = false ): bool {
 		global $wpdb;
-		if ( get_option( self::SCHEMA ) ) {
+		if ( ! $verify && self::schema_current() ) {
 			return true;
 		}
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -41,9 +45,11 @@ final class ApexPress_Image_Queue {
 			) {$charset};"
 		);
 		$fields = $wpdb->get_col( "SHOW COLUMNS FROM {$table}" );
-		$indexes = array_column( $wpdb->get_results( "SHOW INDEX FROM {$table}", ARRAY_A ) ?: array(), 'Key_name' );
+		$indexes = $wpdb->get_results( "SHOW INDEX FROM {$table}", ARRAY_A );
 		if ( array_diff( array( 'attachment_id', 'attempts', 'available_at', 'lease_expires', 'lease_token' ), $fields )
-			|| array_diff( array( 'PRIMARY', 'lease_token', 'ready' ), $indexes ) ) {
+			|| ! ApexPress_Activator::has_index( $indexes, 'PRIMARY', array( 'attachment_id' ), true )
+			|| ! ApexPress_Activator::has_index( $indexes, 'lease_token', array( 'lease_token' ), true )
+			|| ! ApexPress_Activator::has_index( $indexes, 'ready', array( 'available_at', 'lease_expires', 'attempts' ), false ) ) {
 			return false;
 		}
 		$legacy = get_option( self::LEGACY, array() );
@@ -54,7 +60,7 @@ final class ApexPress_Image_Queue {
 				return false;
 			}
 		}
-		update_option( self::SCHEMA, 1, false );
+		update_option( self::SCHEMA, 2, false );
 		delete_option( self::LEGACY );
 		return true;
 	}

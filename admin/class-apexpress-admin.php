@@ -87,7 +87,7 @@ final class ApexPress_Admin {
 				);
 				foreach ( $tabs as $key => $label ) {
 					$url = add_query_arg( array( 'page' => self::PAGE, 'tab' => $key ), admin_url( 'admin.php' ) );
-					printf( '<a class="%1$s" href="%2$s">%3$s</a>', esc_attr( $key === $tab ? 'is-active' : '' ), esc_url( $url ), esc_html( $label ) );
+					printf( '<a class="%1$s" href="%2$s"%4$s>%3$s</a>', esc_attr( $key === $tab ? 'is-active' : '' ), esc_url( $url ), esc_html( $label ), $key === $tab ? ' aria-current="page"' : '' );
 				}
 				?>
 			</nav>
@@ -335,7 +335,6 @@ final class ApexPress_Admin {
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="apx-cleanup-form" data-apx-confirm="<?php esc_attr_e( 'An encrypted backup snapshot will be created, then only the snapshotted rows will be deleted. Continue?', 'apexpress-performance' ); ?>">
 					<input type="hidden" name="action" value="apexpress_database_cleanup"><?php wp_nonce_field( 'apexpress_database_cleanup', '_apexpress_nonce' ); ?>
 					<?php foreach ( $db['cleanup_counts'] as $type => $count ) : ?><label class="apx-clean-row"><input type="checkbox" name="types[]" value="<?php echo esc_attr( $type ); ?>"><span><?php echo esc_html( ucwords( str_replace( '_', ' ', $type ) ) ); ?></span><strong><?php echo esc_html( number_format_i18n( $count ) ); ?></strong></label><?php endforeach; ?>
-					<label class="apx-clean-row"><input type="checkbox" name="types[]" value="expired_transients"><span><?php esc_html_e( 'Expired transients', 'apexpress-performance' ); ?></span><strong>—</strong></label>
 					<button class="button button-primary apx-button-danger" type="submit"><?php esc_html_e( 'Encrypt snapshot & clean selected', 'apexpress-performance' ); ?></button>
 				</form>
 			</div>

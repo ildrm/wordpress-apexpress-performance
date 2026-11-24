@@ -66,6 +66,17 @@ final class ApexPress_WooCommerce {
 		if ( function_exists( 'is_woocommerce' ) && is_woocommerce() ) {
 			return true;
 		}
+		$post = get_post();
+		if ( $post && str_contains( $post->post_content, '<!-- wp:woocommerce/' ) ) {
+			return true;
+		}
+		if ( $post && class_exists( 'WC_Shortcodes' ) ) {
+			foreach ( array( 'product', 'products', 'product_page', 'product_category', 'product_categories', 'add_to_cart', 'best_selling_products', 'recent_products', 'sale_products', 'featured_products', 'top_rated_products', 'related_products', 'woocommerce_cart', 'woocommerce_checkout', 'woocommerce_my_account', 'woocommerce_order_tracking' ) as $tag ) {
+				if ( has_shortcode( $post->post_content, $tag ) ) {
+					return true;
+				}
+			}
+		}
 		return ( function_exists( 'is_cart' ) && is_cart() ) || ( function_exists( 'is_checkout' ) && is_checkout() ) || ( function_exists( 'is_account_page' ) && is_account_page() );
 	}
 }

@@ -53,6 +53,12 @@ final class ApexPress_Plugin {
 
 	public function ensure_schedules(): void {
 		ApexPress_Cache::upgrade_dropin();
+		if ( APEXPRESS_VERSION !== get_option( 'apexpress_version' ) || ! ApexPress_Image_Queue::schema_current() ) {
+			if ( ! get_transient( 'apexpress_schema_retry' ) ) {
+				ApexPress_Activator::install_site();
+			}
+			return;
+		}
 		ApexPress_Activator::schedule_events();
 	}
 }

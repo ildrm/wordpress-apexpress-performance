@@ -31,12 +31,16 @@ final class ApexPress_RUM {
 		$script   = <<<'JS'
 (function(SAMPLE,ENDPOINT){
   if(Math.random()*100>SAMPLE)return;
-  var m={lcp:0,cls:0,inp:0,fcp:0,ttfb:0}, sent=false;
+  var m={}, sent=false;
   var clsWindow=0,clsWindowStart=0,clsLast=0,interactions={};
   try{
-    var n=performance.getEntriesByType('navigation')[0];if(n)m.ttfb=Math.max(0,n.responseStart);
+    var n=performance.getEntriesByType('navigation')[0];if(n && n.responseStart>0)m.ttfb=n.responseStart;
     var p=performance.getEntriesByName('first-contentful-paint')[0];if(p)m.fcp=p.startTime;
+    if(PerformanceObserver.supportedEntryTypes.includes('paint')){
+      new PerformanceObserver(function(l){l.getEntries().forEach(function(e){if(e.name==='first-contentful-paint')m.fcp=e.startTime;});}).observe({type:'paint',buffered:true});
+    }
     new PerformanceObserver(function(l){l.getEntries().forEach(function(e){m.lcp=e.startTime;});}).observe({type:'largest-contentful-paint',buffered:true});
+    if(PerformanceObserver.supportedEntryTypes.includes('layout-shift'))m.cls=0;
     new PerformanceObserver(function(l){l.getEntries().forEach(function(e){
       if(e.hadRecentInput)return;
       if(!clsWindowStart || e.startTime-clsLast>1000 || e.startTime-clsWindowStart>5000){clsWindow=e.value;clsWindowStart=e.startTime;}else{clsWindow+=e.value;}
@@ -46,8 +50,8 @@ final class ApexPress_RUM {
       new PerformanceObserver(function(l){l.getEntries().forEach(function(e){if(!e.interactionId)return;interactions[e.interactionId]=Math.max(interactions[e.interactionId]||0,e.duration);});}).observe({type:'event',durationThreshold:40,buffered:true});
     }
   }catch(e){}
-  function finalizeInp(){var a=Object.keys(interactions).map(function(k){return interactions[k];}).sort(function(a,b){return a-b;});if(a.length)m.inp=a[Math.min(a.length-1,Math.floor((a.length-1)*0.98))];}
-  function send(){if(sent)return;sent=true;finalizeInp();var d={path:location.pathname.slice(0,250),device:matchMedia('(max-width: 782px)').matches?'mobile':'desktop',lcp:Math.round(m.lcp),cls:Math.round(m.cls*1000)/1000,inp:Math.round(m.inp),fcp:Math.round(m.fcp),ttfb:Math.round(m.ttfb)};try{navigator.sendBeacon(ENDPOINT,new Blob([JSON.stringify(d)],{type:'application/json'}));}catch(e){}}
+  function finalizeInp(){var a=Object.keys(interactions).map(function(k){return interactions[k];}).sort(function(a,b){return b-a;});if(a.length)m.inp=a[Math.min(a.length-1,Math.floor((performance.interactionCount || a.length)/50))];}
+  function send(){if(sent)return;sent=true;finalizeInp();var d={path:location.pathname.slice(0,250),device:matchMedia('(max-width: 782px)').matches?'mobile':'desktop'};Object.keys(m).forEach(function(k){d[k]=k==='cls'?Math.round(m[k]*1000)/1000:Math.round(m[k]);});try{navigator.sendBeacon(ENDPOINT,new Blob([JSON.stringify(d)],{type:'application/json'}));}catch(e){}}
   addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')send();});
   addEventListener('pagehide',send,{once:true});
 })(__APX_SAMPLE__,__APX_ENDPOINT__);

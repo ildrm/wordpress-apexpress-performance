@@ -19,7 +19,9 @@ final class ApexPress_Audit {
 		$checks[] = self::check( 'object_cache', __( 'Persistent object cache', 'apexpress-performance' ), $object_cache, $object_cache ? 'Enabled' : 'Not detected', 12 );
 		$checks[] = self::check( 'page_cache', __( 'ApexPress page cache', 'apexpress-performance' ), (bool) ApexPress_Settings::get( 'page_cache' ), ApexPress_Settings::get( 'page_cache' ) ? 'Enabled' : 'Disabled', 12 );
 		$dropin   = ApexPress_Cache::dropin_status();
-		$checks[] = self::check( 'early_cache', __( 'Early cache drop-in', 'apexpress-performance' ), ! empty( $dropin['owned'] ) && ! empty( $dropin['wp_cache'] ), ! empty( $dropin['owned'] ) ? ( ! empty( $dropin['wp_cache'] ) ? 'Active' : 'WP_CACHE disabled' ) : 'Not installed', 8 );
+		$early = ! empty( $dropin['owned'] ) && ! empty( $dropin['wp_cache'] ) && ApexPress_Cache::early_cache_allowed() && ApexPress_Settings::get( 'page_cache' );
+		$early_detail = empty( $dropin['owned'] ) ? 'Not installed' : ( empty( $dropin['wp_cache'] ) ? 'WP_CACHE disabled' : ( $early ? 'Active' : 'Bypassed' ) );
+		$checks[] = self::check( 'early_cache', __( 'Early cache drop-in', 'apexpress-performance' ), $early, $early_detail, 8 );
 		$checks[] = self::check( 'https', __( 'HTTPS', 'apexpress-performance' ), str_starts_with( home_url(), 'https://' ), home_url(), 8 );
 		$checks[] = self::check( 'db', __( 'Database server', 'apexpress-performance' ), true, $wpdb->db_version(), 5 );
 		$checks[] = self::check( 'cron', __( 'WordPress cron', 'apexpress-performance' ), ! ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ), defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? 'Disabled: verify system cron' : 'WP-Cron enabled', 5, true );

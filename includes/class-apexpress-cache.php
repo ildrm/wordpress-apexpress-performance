@@ -10,9 +10,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class ApexPress_Cache {
+	private array $previous_urls = array();
+
 	public function hooks(): void {
-		add_action( 'template_redirect', array( $this, 'maybe_serve' ), -100 );
-		add_action( 'template_redirect', array( $this, 'start_capture' ), -90 );
+		add_action( 'template_redirect', array( $this, 'maybe_serve' ), 98 );
+		add_action( 'template_redirect', array( $this, 'start_capture' ), 99 );
+		add_action( 'update_option_active_plugins', array( self::class, 'refresh_dropin_config' ), 10, 0 );
+		add_action( 'pre_post_update', array( $this, 'remember_published_url' ) );
 		add_action( 'save_post', array( $this, 'purge_related_post' ), 20, 2 );
 		add_action( 'deleted_post', array( $this, 'purge_all' ) );
 		add_action( 'edited_term', array( $this, 'purge_all' ) );
@@ -44,7 +48,7 @@ final class ApexPress_Cache {
 	}
 
 	public function maybe_serve(): void {
-		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! $this->is_cacheable_request() ) {
+		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! $this->is_cacheable_request() || $this->response_requires_bypass() ) {
 			return;
 		}
 		$paths = $this->paths_for_current_request();
@@ -82,7 +86,7 @@ final class ApexPress_Cache {
 	}
 
 	public function start_capture(): void {
-		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! $this->is_cacheable_request() ) {
+		if ( ! ApexPress_Settings::get( 'page_cache' ) || ! $this->is_cacheable_request() || $this->response_requires_bypass() ) {
 			return;
 		}
 		if ( headers_sent() || 'GET' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
@@ -92,14 +96,11 @@ final class ApexPress_Cache {
 	}
 
 	public function capture( string $html ): string {
-		foreach ( headers_list() as $header_line ) {
-			$header_lower = strtolower( $header_line );
-			if ( str_starts_with( $header_lower, 'set-cookie:' ) || str_starts_with( $header_lower, 'vary:' ) ) {
-				return $html;
-			}
-			if ( str_starts_with( $header_lower, 'cache-control:' ) && preg_match( '/\b(?:no-store|no-cache|private)\b/', $header_lower ) ) {
-				return $html;
-			}
+		if ( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE ) {
+			return $html;
+		}
+		if ( $this->response_requires_bypass() ) {
+			return $html;
 		}
 		if ( ApexPress_Settings::get( 'cache_mobile_variant' ) ) {
 			header( 'Vary: Sec-CH-UA-Mobile, User-Agent', false );
@@ -131,6 +132,19 @@ final class ApexPress_Cache {
 		return $html;
 	}
 
+	private function response_requires_bypass(): bool {
+		foreach ( headers_list() as $header_line ) {
+			$header_lower = strtolower( $header_line );
+			if ( str_starts_with( $header_lower, 'set-cookie:' ) || str_starts_with( $header_lower, 'vary:' ) ) {
+				return true;
+			}
+			if ( str_starts_with( $header_lower, 'cache-control:' ) && preg_match( '/\b(?:no-store|no-cache|private)\b/', $header_lower ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public function is_cacheable_request(): bool {
 		if ( ( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE ) || is_admin() || wp_doing_ajax() || wp_is_json_request() || is_feed() || is_robots() || is_trackback() ) {
 			return false;
@@ -142,12 +156,13 @@ final class ApexPress_Cache {
 		if ( isset( $_SERVER['HTTP_AUTHORIZATION'] ) || isset( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) || isset( $_SERVER['HTTP_RANGE'] ) ) {
 			return false;
 		}
-		$home_host = strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
-		$req_host  = strtolower( (string) wp_parse_url( 'http://' . (string) ( $_SERVER['HTTP_HOST'] ?? '' ), PHP_URL_HOST ) );
-		if ( '' === $home_host || '' === $req_host || ! hash_equals( $home_host, $req_host ) ) {
+		$home = wp_parse_url( home_url( '/' ) );
+		$authority = strtolower( $home['host'] ?? '' ) . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
+		if ( '' === $authority || $authority !== strtolower( (string) ( $_SERVER['HTTP_HOST'] ?? '' ) )
+			|| ( is_ssl() ? 'https' : 'http' ) !== ( $home['scheme'] ?? '' ) ) {
 			return false;
 		}
-		if ( is_user_logged_in() || is_preview() || is_search() || is_404() ) {
+		if ( is_user_logged_in() || is_preview() || is_search() || is_404() || ( is_singular() && post_password_required() ) ) {
 			return false;
 		}
 		if ( ! ApexPress_Settings::get( 'cache_query_strings' ) && ! empty( $_GET ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only cache eligibility check.
@@ -181,12 +196,23 @@ final class ApexPress_Cache {
 		return (bool) apply_filters( 'apexpress_cacheable_request', true, $path );
 	}
 
+	public function remember_published_url( int $post_id ): void {
+		if ( 'publish' === get_post_status( $post_id ) ) {
+			$this->previous_urls[ $post_id ] = get_permalink( $post_id );
+		}
+	}
+
 	public function purge_related_post( int $post_id, WP_Post $post ): void {
 		if ( wp_is_post_revision( $post_id ) || 'auto-draft' === $post->post_status ) {
 			return;
 		}
 		$urls = array( home_url( '/' ) );
 		$link = get_permalink( $post_id );
+		$previous = $this->previous_urls[ $post_id ] ?? false;
+		unset( $this->previous_urls[ $post_id ] );
+		if ( $previous ) {
+			$urls[] = $previous;
+		}
 		if ( $link ) {
 			$urls[] = $link;
 		}
@@ -208,7 +234,8 @@ final class ApexPress_Cache {
 			}
 		}
 		$urls = array_values( array_unique( $urls ) );
-		if ( ApexPress_Settings::get( 'cache_query_strings' ) ) {
+		$restricted = 'publish' !== $post->post_status || '' !== $post->post_password;
+		if ( ApexPress_Settings::get( 'cache_query_strings' ) || ( $previous && ( $restricted || ( is_post_type_hierarchical( $post->post_type ) && $link !== $previous ) ) ) ) {
 			$this->purge_all();
 		} else {
 			foreach ( $urls as $url ) {
@@ -218,7 +245,8 @@ final class ApexPress_Cache {
 		if ( ApexPress_Cloudflare::enabled() ) {
 			ApexPress_Cloudflare::purge_urls( $urls );
 		}
-		ApexPress_Cache_Warmer::enqueue_urls( $urls );
+		$skip_warming = $restricted ? array( $link, $previous ) : ( $link !== $previous ? array( $previous ) : array() );
+		ApexPress_Cache_Warmer::enqueue_urls( array_diff( $urls, $skip_warming ) );
 	}
 
 	public function purge_comment_post( int $comment_id, int|string $approved, array $commentdata ): void {
@@ -263,9 +291,11 @@ final class ApexPress_Cache {
 	}
 
 	public static function cache_key_for_url( string $url, bool $mobile = false ): string {
-		$normalized = 'v2|' . strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) ) . '/' . ltrim( (string) wp_parse_url( $url, PHP_URL_PATH ), '/' );
+		$parts = wp_parse_url( $url );
+		$origin = strtolower( ( $parts['scheme'] ?? '' ) . '://' . ( $parts['host'] ?? '' ) ) . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
+		$normalized = 'v3|' . $origin . '/' . ltrim( (string) ( $parts['path'] ?? '' ), '/' );
 		$query      = (string) wp_parse_url( $url, PHP_URL_QUERY );
-		if ( ApexPress_Settings::get( 'cache_query_strings' ) && $query ) {
+		if ( ApexPress_Settings::get( 'cache_query_strings' ) && '' !== $query ) {
 			$normalized .= '?' . $query;
 		}
 		if ( ApexPress_Settings::get( 'cache_mobile_variant' ) ) {
@@ -317,13 +347,25 @@ final class ApexPress_Cache {
 		return false;
 	}
 
+	public static function refresh_dropin_config(): void {
+		self::write_dropin_config_static();
+	}
+
+	public static function early_cache_allowed(): bool {
+		// AegisGuard's request checks and response headers run during WordPress bootstrap.
+		return ! is_multisite() && ( ! defined( 'AEGISGUARD_BASENAME' )
+			|| ! in_array( AEGISGUARD_BASENAME, (array) get_option( 'active_plugins', array() ), true ) );
+	}
+
 	public static function write_dropin_config_static( ?array $settings = null ): bool {
 		self::ensure_dirs();
 		$settings = $settings ?? ApexPress_Settings::get_all();
+		$home = wp_parse_url( home_url( '/' ) );
 		$config   = array(
-			'version'        => 2,
-			'enabled'        => ! is_multisite() && ! empty( $settings['page_cache'] ),
-			'home_host'      => strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) ),
+			'version'        => 3,
+			'enabled'        => self::early_cache_allowed() && ! empty( $settings['page_cache'] ),
+			'authority'      => strtolower( $home['host'] ?? '' ) . ( isset( $home['port'] ) ? ':' . $home['port'] : '' ),
+			'scheme'         => $home['scheme'] ?? '',
 			'mobile_variant' => ! empty( $settings['cache_mobile_variant'] ),
 			'browser_headers' => ! empty( $settings['cache_browser_headers'] ),
 			'charset'        => get_option( 'blog_charset', 'UTF-8' ),
@@ -378,7 +420,7 @@ final class ApexPress_Cache {
 	}
 
 	public static function upgrade_dropin(): void {
-		if ( (int) get_option( 'apexpress_cache_revision' ) >= 2 ) {
+		if ( (int) get_option( 'apexpress_cache_revision' ) >= 3 ) {
 			return;
 		}
 		$target = WP_CONTENT_DIR . '/advanced-cache.php';
@@ -386,12 +428,14 @@ final class ApexPress_Cache {
 			( new self() )->purge_all();
 			if ( is_multisite() ) {
 				self::remove_dropin();
-			} elseif ( defined( 'WP_CACHE' ) && WP_CACHE && empty( self::install_dropin()['ok'] ) ) {
+			} elseif ( ! defined( 'WP_CACHE' ) || ! WP_CACHE ) {
+				self::remove_dropin();
+			} elseif ( empty( self::install_dropin()['ok'] ) ) {
 				return;
 			}
 		}
 		if ( self::write_dropin_config_static() ) {
-			update_option( 'apexpress_cache_revision', 2, false );
+			update_option( 'apexpress_cache_revision', 3, false );
 		}
 	}
 

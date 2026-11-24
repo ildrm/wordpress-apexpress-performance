@@ -48,6 +48,9 @@ final class ApexPress_Security {
 		if ( empty( $home['host'] ) || empty( $test['host'] ) ) {
 			return false;
 		}
-		return strtolower( $home['host'] ) === strtolower( $test['host'] );
+		return ! isset( $test['user'] ) && ! isset( $test['pass'] )
+			&& ( $home['scheme'] ?? '' ) === ( $test['scheme'] ?? '' )
+			&& ( $home['port'] ?? null ) === ( $test['port'] ?? null )
+			&& 0 === strcasecmp( $home['host'], $test['host'] );
 	}
 }

@@ -272,7 +272,9 @@ final class ApexPress_Image_Optimizer {
 		$base_url = trailingslashit( wp_get_upload_dir()['baseurl'] );
 		$delivery = new ApexPress_Delivery();
 		$path = rawurldecode( $parts['path'] );
-		foreach ( array_unique( array( $base_url, $delivery->rewrite_url( $base_url ) ) ) as $base ) {
+		$asset_url = $delivery->rewrite_url( $base_url . basename( $parts['path'] ) );
+		$delivery_base = substr( $asset_url, 0, strrpos( $asset_url, '/' ) + 1 );
+		foreach ( array_unique( array( $base_url, $delivery_base ) ) as $base ) {
 			$uploads = wp_parse_url( $base );
 			if ( isset( $parts['host'] ) && ( 0 !== strcasecmp( $parts['host'], $uploads['host'] ?? '' ) || ( $parts['port'] ?? null ) !== ( $uploads['port'] ?? null ) ) ) {
 				continue;

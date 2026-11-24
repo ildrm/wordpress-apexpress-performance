@@ -46,7 +46,7 @@ final class ApexPress_Secure_Storage {
 			return false;
 		}
 		$path = self::dir() . $name . '.apxbak';
-		return false !== file_put_contents( $path, $payload, LOCK_EX ) ? $path : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		return ApexPress_Cache::atomic_write( $path, $payload ) ? $path : false;
 	}
 
 	public static function save_for_key( string $prefix, string $key, string $plaintext ): string|false {
@@ -117,7 +117,7 @@ final class ApexPress_Secure_Storage {
 		if ( 'sodium-secretbox' === ( $data['a'] ?? '' ) && function_exists( 'sodium_crypto_secretbox_open' ) ) {
 			$nonce  = base64_decode( (string) ( $data['n'] ?? '' ), true );
 			$cipher = base64_decode( (string) ( $data['c'] ?? '' ), true );
-			if ( false === $nonce || false === $cipher ) {
+			if ( false === $nonce || SODIUM_CRYPTO_SECRETBOX_NONCEBYTES !== strlen( $nonce ) || false === $cipher || strlen( $cipher ) < SODIUM_CRYPTO_SECRETBOX_MACBYTES ) {
 				return false;
 			}
 			return sodium_crypto_secretbox_open( $cipher, $nonce, $key );
@@ -126,7 +126,7 @@ final class ApexPress_Secure_Storage {
 			$iv     = base64_decode( (string) ( $data['i'] ?? '' ), true );
 			$tag    = base64_decode( (string) ( $data['t'] ?? '' ), true );
 			$cipher = base64_decode( (string) ( $data['c'] ?? '' ), true );
-			if ( false === $iv || false === $tag || false === $cipher ) {
+			if ( false === $iv || 12 !== strlen( $iv ) || false === $tag || 16 !== strlen( $tag ) || false === $cipher ) {
 				return false;
 			}
 			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );

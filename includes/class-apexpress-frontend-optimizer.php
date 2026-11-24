@@ -13,9 +13,11 @@ final class ApexPress_Frontend_Optimizer {
 	private int $image_counter = 0;
 
 	public function hooks(): void {
-		add_action( 'template_redirect', array( $this, 'start_output_buffer' ), -80 );
+		add_action( 'template_redirect', array( $this, 'start_output_buffer' ), 100 );
 		add_filter( 'script_loader_src', array( $this, 'maybe_minify_js_url' ), 20, 2 );
 		add_filter( 'style_loader_src', array( $this, 'maybe_minify_css_url' ), 20, 2 );
+		add_action( 'wp_print_scripts', array( $this, 'apply_script_strategies' ), PHP_INT_MAX );
+		add_action( 'wp_print_footer_scripts', array( $this, 'apply_script_strategies' ), 0 );
 		add_filter( 'script_loader_tag', array( $this, 'optimize_script_tag' ), 20, 3 );
 		add_filter( 'wp_get_attachment_image_attributes', array( $this, 'optimize_image_attributes' ), 20, 3 );
 		add_filter( 'the_content', array( $this, 'lazy_load_content_iframes' ), 20 );
@@ -77,35 +79,54 @@ final class ApexPress_Frontend_Optimizer {
 		return $this->minified_asset_url( $src, 'js' ) ?: $src;
 	}
 
-	public function optimize_script_tag( string $tag, string $handle, string $src ): string {
-		if ( is_admin() || '' === $src ) {
-			return $tag;
+	public function apply_script_strategies(): void {
+		if ( is_admin() ) {
+			return;
 		}
-		$processor = new WP_HTML_Tag_Processor( $tag );
-		if ( ! $processor->next_tag( 'script' ) ) {
-			return $tag;
-		}
-
-		if ( ApexPress_Settings::get( 'js_delay' ) && $this->matches_any( $src, ApexPress_Settings::lines( 'js_delay_patterns' ) ) ) {
-			$processor->set_attribute( 'type', 'text/apexpress-delayed' );
-			$processor->set_attribute( 'data-apx-src', $src );
-			$processor->remove_attribute( 'src' );
-			return $processor->get_updated_html();
-		}
-
-		$async_handles = ApexPress_Settings::lines( 'js_async_handles' );
-		if ( in_array( $handle, $async_handles, true ) ) {
-			$processor->set_attribute( 'async', 'async' );
-			return $processor->get_updated_html();
-		}
-
-		if ( ApexPress_Settings::get( 'js_defer' ) && ! in_array( $handle, ApexPress_Settings::lines( 'js_defer_excludes' ), true ) ) {
-			global $wp_scripts;
-			$before = $wp_scripts instanceof WP_Scripts ? $wp_scripts->get_data( $handle, 'before' ) : false;
-			$after  = $wp_scripts instanceof WP_Scripts ? $wp_scripts->get_data( $handle, 'after' ) : false;
-			if ( empty( $before ) && empty( $after ) ) {
-				$processor->set_attribute( 'defer', 'defer' );
+		$scripts = wp_scripts();
+		$async = ApexPress_Settings::lines( 'js_async_handles' );
+		$defer = ApexPress_Settings::get( 'js_defer' );
+		$excluded = ApexPress_Settings::lines( 'js_defer_excludes' );
+		foreach ( $scripts->queue as $handle ) {
+			if ( $scripts->get_data( $handle, 'strategy' ) ) {
+				continue;
 			}
+			if ( in_array( $handle, $async, true ) ) {
+				wp_script_add_data( $handle, 'strategy', 'async' );
+			} elseif ( $defer && ! in_array( $handle, $excluded, true ) ) {
+				wp_script_add_data( $handle, 'strategy', 'defer' );
+			}
+		}
+	}
+
+	public function optimize_script_tag( string $tag, string $handle, string $src ): string {
+		if ( is_admin() || ! ApexPress_Settings::get( 'js_delay' ) || ! $this->matches_any( $src, ApexPress_Settings::lines( 'js_delay_patterns' ) ) ) {
+			return $tag;
+		}
+		$scripts = wp_scripts();
+		if ( $scripts->get_data( $handle, 'after' ) ) {
+			return $tag;
+		}
+		foreach ( $scripts->registered as $script ) {
+			if ( in_array( $handle, $script->deps, true ) ) {
+				return $tag;
+			}
+		}
+
+		$processor = new WP_HTML_Tag_Processor( $tag );
+		while ( $processor->next_tag( 'script' ) ) {
+			// WordPress may prefix the external tag with inline data and translations.
+			if ( ! is_string( $processor->get_attribute( 'src' ) ) ) {
+				continue;
+			}
+			$type = $processor->get_attribute( 'type' );
+			if ( $type && ! in_array( $type, array( 'text/javascript', 'application/javascript' ), true ) ) {
+				return $tag;
+			}
+			$processor->set_attribute( 'data-apx-src', $processor->get_attribute( 'src' ) );
+			$processor->set_attribute( 'type', 'text/apexpress-delayed' );
+			$processor->remove_attribute( 'src' );
+			break;
 		}
 		return $processor->get_updated_html();
 	}
@@ -116,14 +137,14 @@ final class ApexPress_Frontend_Optimizer {
 		}
 		$this->image_counter++;
 		if ( ApexPress_Settings::get( 'lazy_images' ) && $this->image_counter > 1 ) {
-			if ( empty( $attr['loading'] ) ) {
+			if ( empty( $attr['loading'] ) && 'high' !== ( $attr['fetchpriority'] ?? '' ) ) {
 				$attr['loading'] = 'lazy';
 			}
 			if ( empty( $attr['decoding'] ) ) {
 				$attr['decoding'] = 'async';
 			}
 		}
-		if ( ApexPress_Settings::get( 'first_image_high_priority' ) && 1 === $this->image_counter ) {
+		if ( ApexPress_Settings::get( 'first_image_high_priority' ) && 1 === $this->image_counter && 'lazy' !== ( $attr['loading'] ?? '' ) ) {
 			$attr['loading'] = 'eager';
 			if ( empty( $attr['fetchpriority'] ) ) {
 				$attr['fetchpriority'] = 'high';
@@ -136,17 +157,13 @@ final class ApexPress_Frontend_Optimizer {
 		if ( ! ApexPress_Settings::get( 'lazy_iframes' ) || is_admin() ) {
 			return $content;
 		}
-		return preg_replace_callback(
-			'/<iframe\b[^>]*>/i',
-			static function ( array $match ): string {
-				$tag = $match[0];
-				if ( stripos( $tag, ' loading=' ) !== false ) {
-					return $tag;
-				}
-				return preg_replace( '/<iframe\b/i', '<iframe loading="lazy"', $tag, 1 ) ?? $tag;
-			},
-			$content
-		) ?? $content;
+		$processor = new WP_HTML_Tag_Processor( $content );
+		while ( $processor->next_tag( 'iframe' ) ) {
+			if ( null === $processor->get_attribute( 'loading' ) ) {
+				$processor->set_attribute( 'loading', 'lazy' );
+			}
+		}
+		return $processor->get_updated_html();
 	}
 
 	public function print_delayed_script_loader(): void {

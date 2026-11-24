@@ -33,17 +33,26 @@ final class ApexPress_Delivery {
 		if ( empty( $parts['path'] ) || empty( $home['host'] ) ) {
 			return $url;
 		}
-		if ( ! empty( $parts['host'] ) && strtolower( $parts['host'] ) !== strtolower( $home['host'] ) ) {
+		if ( isset( $parts['scheme'] ) && ! in_array( strtolower( $parts['scheme'] ), array( 'http', 'https' ), true ) ) {
+			return $url;
+		}
+		if ( isset( $parts['user'] ) || isset( $parts['pass'] ) || ( empty( $parts['host'] ) && ! str_starts_with( $url, '/' ) ) ) {
+			return $url;
+		}
+		if ( ! empty( $parts['host'] ) && ( strcasecmp( $parts['host'], $home['host'] ) || ( $parts['port'] ?? null ) !== ( $home['port'] ?? null ) ) ) {
 			return $url;
 		}
 		$ext = strtolower( pathinfo( $parts['path'], PATHINFO_EXTENSION ) );
 		$allowed = array_map( 'trim', explode( ',', (string) ApexPress_Settings::get( 'cdn_extensions', 'css,js,jpg,jpeg,png,gif,webp,avif,svg,woff,woff2' ) ) );
-		if ( $ext && ! in_array( $ext, $allowed, true ) ) {
+		if ( '' === $ext || ! in_array( $ext, $allowed, true ) ) {
 			return $url;
 		}
 		$rewritten = $cdn . '/' . ltrim( $parts['path'], '/' );
-		if ( ! empty( $parts['query'] ) ) {
+		if ( isset( $parts['query'] ) ) {
 			$rewritten .= '?' . $parts['query'];
+		}
+		if ( isset( $parts['fragment'] ) ) {
+			$rewritten .= '#' . $parts['fragment'];
 		}
 		return esc_url_raw( $rewritten );
 	}
@@ -55,7 +64,7 @@ final class ApexPress_Delivery {
 		if ( ! empty( $attr['src'] ) ) {
 			$attr['src'] = $this->rewrite_url( (string) $attr['src'] );
 		}
-		if ( ! empty( $attr['srcset'] ) ) {
+		if ( ! empty( $attr['srcset'] ) && false === stripos( $attr['srcset'], 'data:' ) ) {
 			$parts = array_map( 'trim', explode( ',', (string) $attr['srcset'] ) );
 			foreach ( $parts as &$part ) {
 				$segments = preg_split( '/\s+/', $part, 2 );
@@ -110,7 +119,7 @@ final class ApexPress_Delivery {
 				continue;
 			}
 			$crossorigin = 'font' === $as ? ' crossorigin' : '';
-			echo '<link rel="preload" href="' . esc_url( $url ) . '" as="' . esc_attr( $as ) . '"' . $crossorigin . '>\n'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $crossorigin is a fixed literal.
+			echo '<link rel="preload" href="' . esc_url( $url ) . '" as="' . esc_attr( $as ) . '"' . $crossorigin . ">\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $crossorigin is a fixed literal.
 		}
 	}
 
